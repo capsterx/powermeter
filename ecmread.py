@@ -1,4 +1,5 @@
 #!/usr/bin/env python -u
+__version__  = '2.4.2'
 '''PowerMeter Data Processor for Brultech ECM-1240.
 
 Collect data from Brultech ECM-1240 power monitors.  Print the data, save the
@@ -530,15 +531,15 @@ Changelog:
 * For channel 1 & 2, show positive and negative values.
 
 '''
-__author__	= 'Brian Jackson; Kelvin Kakugawa; Marc MERLIN; ben; mwall'
+__author__  = 'Brian Jackson; Kelvin Kakugawa; Marc MERLIN; ben; mwall'
 
 # set skip_upload to print out what would be uploaded but do not actually do
 # the upload.
 SKIP_UPLOAD = 0
 
-MINUTE	= 60
-HOUR	= 60 * MINUTE
-DAY	= 24 * HOUR
+MINUTE  = 60
+HOUR  = 60 * MINUTE
+DAY  = 24 * HOUR
 
 BUFFER_TIMEFRAME = 5*MINUTE
 DEFAULT_UPLOAD_TIMEOUT = 15 # seconds
@@ -547,7 +548,7 @@ DEFAULT_UPLOAD_PERIOD = 15*MINUTE
 # serial settings
 # the com/serial port the ecm is connected to (COM4, /dev/ttyS01, etc)
 SERIAL_PORT = "/dev/ttyUSB0"
-SERIAL_BAUD = 19200		   # the baud rate we talk to the ecm
+SERIAL_BAUD = 19200       # the baud rate we talk to the ecm
 
 # ethernet settings
 # the etherbee defaults to pushing data to port 8083
@@ -672,6 +673,7 @@ try:
 except Exception, e:
     serial = None
 
+
 try:
     import MySQLdb
 except Exception, e:
@@ -699,9 +701,10 @@ except Exception, e:
     ConfigParser = None
 
 
+
 # settings for ECM-1240 packets
-START_HEADER0	  = 254
-START_HEADER1	  = 255
+START_HEADER0    = 254
+START_HEADER1    = 255
 ECM1240_PACKET_ID = 3
 END_HEADER0       = 255
 END_HEADER1       = 254
@@ -1074,7 +1077,7 @@ class SerialCollector(BufferedDataCollector):
             print 'Error: serial module could not be imported.'
             sys.exit(1)
 
-        self._port	= port
+        self._port  = port
         self._baudrate = int(rate)
         self.conn = None
 
@@ -1280,8 +1283,8 @@ class DatabaseCollector(BaseDataCollector):
 class MovingBuffer(object):
     '''Maintain fixed-size buffer of data over time'''
     def __init__(self, max_timeframe=DAY):
-        self.time_points	= []
-        self.max_timeframe	= max_timeframe
+        self.time_points  = []
+        self.max_timeframe  = max_timeframe
 
     def insert(self, timestamp, time_dict):
         bisect.insort(self.time_points, (timestamp, time_dict))
@@ -1481,8 +1484,8 @@ class MySqlProcessor(DatabaseProcessor):
             print 'DB Error: MySQLdb module could not be imported.'
             sys.exit(1)
 
-        self.db_host     = kwargs.get('db_host')	 or DB_HOST
-        self.db_user     = kwargs.get('db_user')	 or DB_USER
+        self.db_host     = kwargs.get('db_host')   or DB_HOST
+        self.db_user     = kwargs.get('db_user')   or DB_USER
         self.db_passwd   = kwargs.get('db_passwd')   or DB_PASSWD
         self.db_database = kwargs.get('db_database') or DB_DATABASE
         self.db_table    = self.db_database + '.' + self.db_table
@@ -1556,7 +1559,7 @@ class UploadProcessor(BaseProcessor):
 
     def process_calculated(self, ecm_serial, packets):
         pass
-		
+    
     def process_compiled(self, packet, packet_buffer):
         sn = getserial(packet)
         if not self.time_to_upload(sn):
@@ -1567,7 +1570,7 @@ class UploadProcessor(BaseProcessor):
         for a,b in zip(data[0:], data[1:]):
             packets.append(calculate(b[1],a[1]))
         self.process_calculated(sn, packets)
-	
+  
     def handle(self, exception):
         return False
 
