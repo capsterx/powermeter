@@ -923,6 +923,7 @@ class BaseDataCollector(object):
             for p in self.packet_processor:
                 dbgmsg('setup %s' % p.__class__.__name__)
                 p.setup()
+                dbgmsg('setup done')
 
             while True:
                 try:
