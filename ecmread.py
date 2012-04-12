@@ -533,6 +533,13 @@ Changelog:
 '''
 __author__  = 'Brian Jackson; Kelvin Kakugawa; Marc MERLIN; ben; mwall'
 
+try:
+  import eventlet
+  eventlet.monkey_patch(socket=True, select=True)
+except:
+  eventlet = None
+  pass
+
 # set skip_upload to print out what would be uploaded but do not actually do
 # the upload.
 SKIP_UPLOAD = 0
@@ -1054,14 +1061,14 @@ class BufferedDataCollector(BaseDataCollector):
         print "Processing packet"
         packet['time_created'] = getgmtime()
         self.packet_buffer.insert(packet['time_created'], packet)
-        self.process(packet)
+        self.process(full_packet, packet)
 
     # process a compiled packet
-    def process(self, packet):
+    def process(self, full_data, packet):
         for p in self.packet_processor:
             try:
                 dbgmsg('processing with %s' % p.__class__.__name__)
-                p.process_compiled(packet, self.packet_buffer)
+                p.process_raw_compiled(full_data, packet, self.packet_buffer)
             except Exception, e:
                 if not p.handle(e):
                     wrnmsg('Exception in %s: %s' % (p.__class__.__name__, e))
@@ -1344,13 +1351,100 @@ class BaseProcessor(object):
         pass
 
     def process_compiled(self, packet, packet_buffer):
-        pass
-	
+      pass
+
+    def process_raw_compiled(self, full_packet, packet, packet_buffer):
+        self.process_compiled(packet, packet_buffer)
+  
     def handle(self, exception):
         return False
 
     def cleanup(self):
         pass
+
+class RawServer(BaseProcessor):
+  def __init__(self, *args, **kwargs):
+    super(RawServer, self).__init__(*args, **kwargs)
+    self.host        = kwargs.get('host')
+    self.port     = int(kwargs.get('port'))
+    self.hosts = []
+    self.server = None
+
+  def setup(self):
+    eventlet.spawn_n(self.run)
+
+  def run(self):
+    self.server = eventlet.listen((self.host, self.port))
+    while True:
+        try:
+            print "Trying accept"
+            new_sock, address = self.server.accept()
+            print "accepted", address
+            self.hosts.append(new_sock.makefile('rw'))
+        except (SystemExit, KeyboardInterrupt):
+            break
+  
+  def cleanup(self):
+    if self.server:
+      self.server.close()
+      self.server = None
+    for host in self.hosts:
+      host.close()
+    self.hosts = None
+
+  def do_write(self, host, full_packet):
+    try:
+      print "Writing to host... %s" % full_packet
+      host.write(full_packet)
+      host.flush()
+      print "Wrote packet"
+      return True
+    except:
+      print "Error"
+      return False
+   
+  def process_raw_compiled(self, full_packet, packet, packet_buffer):
+    self.hosts[:] = [host for host in self.hosts if self.do_write(host, full_packet)]
+    print "Hosts left %s" % self.hosts
+
+class RawClient(BaseProcessor):
+  def __init__(self, *args, **kwargs):
+    super(RawClient, self).__init__(*args, **kwargs)
+    self.host        = kwargs.get('host')
+    self.port     = int(kwargs.get('port'))
+    self.socket = None
+
+  def setup(self):
+    eventlet.spawn_n(self.run)
+
+  def run(self):
+    while not self.socket:
+      try:
+        self.socket = eventlet.connect((self.host, self.port))
+      except:
+        time.sleep(5)
+       
+    print "Connected to client"
+  
+  def cleanup(self):
+    if self.socket:
+      self.socket.close()
+      self.socket = None
+
+  def process_raw_compiled(self, full_packet, packet, packet_buffer):
+    try:
+      print "Writing to host... %s" % full_packet
+      if self.socket:
+        self.socket.send(full_packet)
+      print "Wrote packet"
+      return True
+    except Exception, e:
+      self.socket = None
+      print "Error"
+      wrnmsg('Exception in %s: %s' % (self.__class__.__name__, e))
+      if LOGLEVEL >= LOG_DEBUG:
+          traceback.print_exc()
+      eventlet.spawn_n(self.run)
 
 
 class PrintProcessor(BaseProcessor):
@@ -2290,6 +2384,18 @@ if __name__ == '__main__':
     group.add_option('--pbe-token', help='token')
     group.add_option('--pbe-feed', help='feed')
     parser.add_option_group(group)
+   
+    group = optparse.OptionGroup(parser, 'Raw server emulation')
+    group.add_option('--raw_server', action='store_true', dest='raw_server_out')
+    group.add_option('--raw_server_host', action='store')
+    group.add_option('--raw_server_port', action='store', type=int)
+    parser.add_option_group(group)
+    
+    group = optparse.OptionGroup(parser, 'Raw client emulation')
+    group.add_option('--raw_client', action='store_true', dest='raw_client_out')
+    group.add_option('--raw_client_host', action='store')
+    group.add_option('--raw_client_port', action='store', type=int)
+    parser.add_option_group(group)
 
     (options, args) = parser.parse_args()
 
@@ -2392,6 +2498,23 @@ if __name__ == '__main__':
                     'pbe_token':   options.pbe_token,
                     'pbe_feed':    options.pbe_feed,
                     }))
+    if options.raw_server_out:
+      if not eventlet:
+        print "Can't emulate raw server without eventlet"
+        sys.exit(1)
+      else:
+        procs.append(RawServer(args, **{
+                    'port':       options.raw_server_port,
+                    'host':       options.raw_server_host}))
+    
+    if options.raw_client_out:
+      if not eventlet:
+        print "Can't emulate raw client without eventlet"
+        sys.exit(1)
+      else:
+        procs.append(RawClient(args, **{
+                    'port':       options.raw_client_port,
+                    'host':       options.raw_client_host}))
 
     # Data Collector setup
     if options.serial_read:
