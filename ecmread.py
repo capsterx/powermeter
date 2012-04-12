@@ -1,5 +1,4 @@
-#!/usr/bin/python -u
-__version__	= '2.4.2'
+#!/usr/bin/env python -u
 '''PowerMeter Data Processor for Brultech ECM-1240.
 
 Collect data from Brultech ECM-1240 power monitors.  Print the data, save the
@@ -864,6 +863,30 @@ def calculate(now, prev):
     return ret
 
 
+class Buffer:
+  def __init__(self):
+    self.buf = ""
+
+  def __len__(self):
+    return len(self.buf)
+
+  def get_bytes(self, start, end):
+    return self.buf[start:start+end]
+
+  def get_byte(self, num):
+    if len(self.buf) < num + 1:
+        raise Exception("Unepected request %d - %d" % (num, len(self.buf)))
+    byte = ord(self.buf[num])
+    return byte
+
+  def remove(self, num):
+    ret = self.buf[0:num]
+    self.buf = self.buf[num:]
+    return ret
+
+  def append(self, buf):
+    self.buf += buf
+
 # Data Collector classes
 
 class BaseDataCollector(object):
@@ -920,6 +943,7 @@ class BufferedDataCollector(BaseDataCollector):
         super(BufferedDataCollector, self).__init__(packet_processor)
         self.packet_buffer = CompoundBuffer(BUFFER_TIMEFRAME)
         dbgmsg('buffer size is %d' % BUFFER_TIMEFRAME)
+        self.buf = Buffer()
 
     def _convert(self, bytes):
         return reduce(lambda x,y:x+y[0] * (256**y[1]), zip(bytes,xrange(len(bytes))),0)
@@ -968,82 +992,63 @@ class BufferedDataCollector(BaseDataCollector):
 
         return now
 
-    # Read the indicated number of bytes.  This should be overridden by derived
-    # classes to do the actual reading of bytes.
-    def readbytes(self, count):
-        return ''
-
-    # Loop until no more data are available.  Put the data into a packet, check
-    # the data, then compile the packet into a structure.
     def read(self):
-        data = self.readbytes(1)
-        if not data:
-            return
+      while True:
+        self.read_data()
 
-        byte = ord(data)
-        if byte != START_HEADER0:
-            dbgmsg("expected START_HEADER0 %s, got %s" %
-                   (hex(START_HEADER0), hex(byte)))
-            return
+    # Called by derived classes when data has been read
+    def data_read(self, new_data):
+      self.buf.append(new_data)
+      data = self.buf
+      while len(data) >= 65:
+        header = [START_HEADER0, START_HEADER1, ECM1240_PACKET_ID]
+        valid = True
+        for i in range(len(header)):
+          byte = data.get_byte(i)
+          if byte != header[i]:
+              dbgmsg("expected START_HEADER%d %s, got %s" %
+                     (i, hex(header[i]), hex(byte)))
+              data.remove(i + 1)
+              valid = False
+              break
+        if not valid:
+          continue
 
-        data = self.readbytes(1)
-        byte = ord(data)
-        if byte != START_HEADER1:
-            dbgmsg("expected START_HEADER1 %s, got %s" %
-                   (hex(START_HEADER1), hex(byte)))
-            return
+        packet = data.get_bytes(len(header), DATA_BYTES_LENGTH)
 
-        data = self.readbytes(1)
-        byte = ord(data)
-        if byte != ECM1240_PACKET_ID:
-            dbgmsg("expected ECM1240_PACKET_ID %s, got %s" %
-                   (hex(ECM1240_PACKET_ID), hex(byte)))
-            return
-
-        packet = ''
-        while len(packet) < DATA_BYTES_LENGTH:
-            data = self.readbytes(DATA_BYTES_LENGTH-len(packet))
-            if not data: # No data left
-                break
-            packet += data
- 
-        if len(packet) < DATA_BYTES_LENGTH:
-            infmsg("incomplete packet: expected %d bytes, got %d" %
-                   (DATA_BYTES_LENGTH, len(packet)))
-            return
-
-        data = self.readbytes(1)
-        byte = ord(data)
-        if byte != END_HEADER0:
-            dbgmsg("expected END_HEADER0 %s, got %s" %
-                   (hex(END_HEADER0), hex(byte)))
-            return
-
-        data = self.readbytes(1)
-        byte = ord(data)
-        if byte != END_HEADER1:
-            dbgmsg("expected END_HEADER1 %s, got %s" %
-                   (hex(END_HEADER1), hex(byte)))
-            return
+        footer = [END_HEADER0, END_HEADER1]
+        for i in range(len(footer)):
+          byte = data.get_byte(len(header) + DATA_BYTES_LENGTH + i)
+          if byte != footer[i]:
+              dbgmsg("expected END_HEADER%d %s, got %s" %
+                     (i, hex(footer[i]), hex(byte)))
+              data.remove(len(header) + DATA_BYTES_LENGTH + i + 1)
+              valid = False
+              break
+        if not valid:
+          continue
 
         # we only handle ecm-1240 devices
         uid = ord(packet[29:30])
         if uid != ECM1240_UNIT_ID:
             infmsg("unrecognized unit id: expected %s, got %s" %
                    (hex(ECM1240_UNIT_ID), hex(uid)))
-            return
+            data.remove(59 + 3 + 2)
+            continue
 
         # if the checksum is incorrect, ignore the packet
         checksum = calculate_checksum(packet)
-        data = self.readbytes(1)
-        byte = ord(data)
+        print "Checking byte %d" % (len(header) + DATA_BYTES_LENGTH + len(footer))
+        byte = data.get_byte(64)
+        full_packet = data.remove(65)
         if byte != checksum:
             infmsg("bad checksum for %s: expected %s, got %s" %
                    (getserialraw(packet), hex(checksum), hex(byte)))
-            return
+            continue
 
         packet = [ord(c) for c in packet]
         packet = self._compile(packet)
+        print "Processing packet"
         packet['time_created'] = getgmtime()
         self.packet_buffer.insert(packet['time_created'], packet)
         self.process(packet)
@@ -1076,11 +1081,11 @@ class SerialCollector(BufferedDataCollector):
         infmsg('serial port: %s' % self._port)
         infmsg('baud rate: %d' % self._baudrate)
 
-    def readbytes(self, count):
-        return self.conn.read(count)
+    def read_data(self):
+        self.data_read(self.conn.read(8096))
 
     def setup(self):
-        self.conn = serial.Serial(self._port, self._baudrate)
+        self.conn = serial.Serial(self._port, self._baudrate, timeout=0)
         self.conn.open()
 
     def cleanup(self):
@@ -1100,8 +1105,8 @@ class SocketServerCollector(BufferedDataCollector):
         infmsg('host: %s' % self._host)
         infmsg('port: %d' % self._port)
 
-    def readbytes(self, count):
-        return self.conn.recv(count)
+    def read_data(self):
+        self.data_read(self.conn.recv(8096))
 
     def read(self):
         try:
@@ -1139,8 +1144,8 @@ class SocketClientCollector(BufferedDataCollector):
         infmsg('host: %s' % self._host)
         infmsg('port: %d' % self._port)
 
-    def readbytes(self, count):
-        return self.sock.recv(count)
+    def read_data(self, count):
+        self.data_read(sock.recv(count))
 
     def read(self):
         try:
