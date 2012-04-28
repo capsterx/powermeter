@@ -135,8 +135,4 @@ class PlotWattProcessor(UploadProcessor):
     @staticmethod
     def make(options, procs):
       if options.plotwatt_out:
-          procs.append(PlotWattProcessor(args, **{
-                      'pw_api_key':   options.pw_api_key,
-                      'pw_house_id':  options.pw_house_id,
-                      'pw_map':       options.pw_map,
-                      }))
+          procs.append(PlotWattProcessor(**vars(options)))
