@@ -32,6 +32,7 @@ class Constants:
   OEM_TOKEN         = ''
 
 class OpenEnergyMonitorProcessor(UploadProcessor):
+  INSERT = True
   def __init__(self, *args, **kwargs):
     super(OpenEnergyMonitorProcessor, self).__init__(*args, **kwargs)
     self.url     = kwargs.get('oem_url')   or OEM_URL
