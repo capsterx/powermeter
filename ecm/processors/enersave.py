@@ -101,7 +101,7 @@ class EnerSaveProcessor(UploadProcessor):
                         sensors[dev_id] = { 'type':dev_type, 'desc':dev_desc }
                         if not dev_id in readings:
                             readings[dev_id] = []
-                            readings[dev_id].append('<energy time="%d" wh="%.4f"/>' %
+                            readings[dev_id].append('<energy time="%d" kh="%.7f"/>' %
                                                     (p['time_created'], p[c+'_wh']))
             else:
                 for c in ECM1240_CHANNELS:
@@ -111,7 +111,7 @@ class EnerSaveProcessor(UploadProcessor):
                     sensors[dev_id] = { 'type':dev_type, 'desc':dev_desc }
                     if not dev_id in readings:
                         readings[dev_id] = []
-                        readings[dev_id].append('<energy time="%d" wh="%.4f"/>' %
+                        readings[dev_id].append('<energy time="%d" kh="%.7f"/>' %
                                                 (p['time_created'], p[c+'_wh']))
         s = []
         for key in sensors:
