@@ -160,4 +160,4 @@ class EnerSaveProcessor(UploadProcessor):
     @staticmethod
     def make(options, procs):
       if options.enersave_out:
-          procs.append(**vars(options))
+          procs.append(EnerSaveProcessor(**vars(options)))
