@@ -62,4 +62,4 @@ class MySqlProcessor(DatabaseProcessor):
     @staticmethod
     def make(options, procs):
       if options.db_out:
-          procs.append(**vars(options))
+        procs.append(MySqlProcessor(**vars(options))
