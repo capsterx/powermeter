@@ -3,6 +3,7 @@ from ecm_decoder import *
 from utils import *
 from newecm import *
 from collector import *
+import inspect
 #### END HEADER
 
 class UploadProcessor(BaseProcessor):
@@ -58,6 +59,12 @@ class UploadProcessor(BaseProcessor):
         req.add_header("User-Agent", "ecmread")
         return req
 
+    def get_url_args(self, req, data):
+      if len(inspect.getargspec(urllib2.urlopen)[0]) == 2:
+        return [req, data]
+      else:
+        return [req, data, self.timeout]
+
     def _urlopen(self, sn, url, data):
         try:
             req = self._create_request(url)
@@ -68,9 +75,9 @@ class UploadProcessor(BaseProcessor):
             if SKIP_UPLOAD:
                 result = UploadProcessor.FakeResult()
             elif self.urlopener:
-                result = self.urlopener.open(req, data, self.timeout)
+                result = self.urlopener.open(*self.get_url_args(req, data))
             else:
-                result = urllib2.urlopen(req, data, self.timeout)
+                result = urllib2.urlopen(*self.get_url_args(req, data))
 
             infmsg('%s: %d bytes uploaded for %s' %
                    (self.__class__.__name__, len(data), sn))
