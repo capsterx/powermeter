@@ -22,8 +22,6 @@ class RawClient(BaseProcessor):
       except:
         time.sleep(5)
        
-    print "Connected to client"
-  
   def cleanup(self):
     if self.socket:
       self.socket.close()
@@ -32,15 +30,12 @@ class RawClient(BaseProcessor):
   def process_raw_compiled(self, full_packet, packet, packet_buffer):
     try:
       if self.socket:
-        print "Writing to host... %s" % full_packet
         self.socket.send(full_packet)
-        print "Wrote packet"
       return True
     except Exception, e:
       if self.socket:
         self.socket.close()
         self.socket = None
-      print "Error"
       wrnmsg('Exception in %s: %s' % (self.__class__.__name__, e))
       if LOGLEVEL >= LOG_DEBUG:
           traceback.print_exc()

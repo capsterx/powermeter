@@ -20,11 +20,8 @@ class RawServer(BaseProcessor):
     self.server = eventlet.listen((self.host, self.port))
     while True:
         try:
-            print "Trying accept"
             new_sock, address = self.server.accept()
-            print "accepted", address
             self.hosts.append(new_sock)
-            print self.hosts
             self.test_all()
         except (SystemExit, KeyboardInterrupt):
             break
@@ -37,12 +34,9 @@ class RawServer(BaseProcessor):
     self.hosts[:] = [host for host in self.hosts if self.do_write(host, s)]
   
   def test_all(self):
-    print "Selecting on %s" % self.hosts
     r, w, e = select.select(self.hosts, [], [], 0)
-    print "Checking up on %s" % r
     for h in r:
       if not h.recv(1024):
-        print "Removing host %s" % h
         self.hosts.remove(h)
 
   def try_read(self, host):
@@ -50,20 +44,16 @@ class RawServer(BaseProcessor):
       f = host.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT)
       if not f:
         return False
-      print "Host is ok '%s'" % f
       return True
     except Exception, e:
-      print "Host is not ok"
       host.close()
       traceback.print_exc()
       return False
   
   def cleanup(self):
     for host in self.hosts:
-      print "Closing host for cleanup"
       host.close()
     if self.server:
-      print "Closing server"
       self.server.close()
       self.server = None
     self.hosts = None
@@ -72,15 +62,12 @@ class RawServer(BaseProcessor):
     try:
       host.send(full_packet)
       #host.flush()
-      print "Wrote packet"
       return True
     except:
-      print "Error"
       return False
    
   def process_raw_compiled(self, full_packet, packet, packet_buffer):
     self.write_all(full_packet)
-    print "Hosts left %s" % self.hosts
 
   @staticmethod
   def make_group(parser):
