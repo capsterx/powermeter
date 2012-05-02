@@ -142,6 +142,7 @@ class EnerSaveProcessor(UploadProcessor):
     def _create_request(self, url):
         req = super(EnerSaveProcessor, self)._create_request(url)
         req.add_header("Content-Type", "application/xml")
+        req.add_header("Connection", "Close")
         req.add_header("Token", self.token)
         return req
 
