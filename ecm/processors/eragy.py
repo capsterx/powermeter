@@ -60,7 +60,7 @@ CLASS='EragyProcessor'
 class Constants:
 # eragy defaults
   ERAGY_URL           = 'http://d.myeragy.com/energyremote.aspx'
-  ERAGY_UPLOAD_PERIOD = 2 * MINUTE
+  ERAGY_UPLOAD_PERIOD = 5 * MINUTE
   ERAGY_TIMEOUT       = 15 # seconds
   ERAGY_GATEWAY_ID    = ''
   ERAGY_TOKEN         = ''
