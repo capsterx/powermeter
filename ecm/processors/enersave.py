@@ -111,20 +111,25 @@ class EnerSaveProcessor(UploadProcessor):
                     sensors[dev_id] = { 'type':dev_type, 'desc':dev_desc }
                     if not dev_id in readings:
                         readings[dev_id] = []
-                    readings[dev_id].append('<energy time="%d" kh="%.7f"/>' %
-                                              (p['time_created'], p[c+'_wh']))
-        s = []
-        for key in sensors:
-            s.append('<sensor id="%s" type="%s" description="%s">' %
-                     (key, sensors[key]['type'], sensors[key]['desc']))
-            s.append(''.join(readings[key]))
-            s.append('</sensor>')
-        if len(s):
-            s.insert(0, '<?xml version="1.0" encoding="UTF-8" ?>')
-            s.insert(1, '<upload>')
-            s.append('</upload>')
-            self._urlopen(ecm_serial, self.url, ''.join(s))
-            # FIXME: check for server response
+                    readings[dev_id].append('<energy time="%d" wh="%.4f"/>' %
+                                              (p['time_created'], p[c+'_wh'] * 1000))
+        while len(sensors) > 0:
+          s = []
+          for key in sensors.keys():
+              s.append('<sensor id="%s" type="%s" description="%s">' %
+                       (key, sensors[key]['type'], sensors[key]['desc']))
+              r = readings[key][0:10]
+              readings[key] = readings[key][10:]
+              if len(readings[key]) == 0:
+                del sensors[key]
+              s.append(''.join(r))
+              s.append('</sensor>')
+          if len(s):
+              #s.insert(0, '<?xml version="1.0" encoding="UTF-8" ?>')
+              s.insert(0, '<upload>')
+              s.append('</upload>')
+              self._urlopen(ecm_serial, self.url, ''.join(s))
+              # FIXME: check for server response
         self.mark_upload_complete(ecm_serial)
 
     def _handle_urlopen_error(self, e, sn, url, payload):
