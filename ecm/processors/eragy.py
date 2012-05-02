@@ -115,7 +115,7 @@ class EragyProcessor(UploadProcessor):
         for ecm_serial, packets in total_packets.iteritems():
           osn = obfuscate_serial(ecm_serial)
           for p in packets:
-            if p['time_created'] - self.last_publish_times.get(ecm_serial, 0) >= 59:
+            if p['time_created'] - self.last_publish_times.get(ecm_serial, 0) >= 30:
               for idx,c in enumerate(ECM1240_CHANNELS):
                 key = osn + '_' + c
                 if not key in times:
