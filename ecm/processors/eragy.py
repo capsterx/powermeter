@@ -121,7 +121,7 @@ class EragyProcessor(UploadProcessor):
                 if not key in times:
                   times[key] = []
                 watts = p[c+'_wh'] * 1000
-  	        times[key].append('<cumulative timestamp="%s" watts="%d"/>' % (p['time_created'], watts))
+  	        times[key].append('<cumulative timestamp="%s" watts="%f"/>' % (p['time_created'], watts))
               self.last_publish_times[ecm_serial] = p['time_created']
         s = []
         for key, ts in times.iteritems():
